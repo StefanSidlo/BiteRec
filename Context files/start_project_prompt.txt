@@ -1,0 +1,27 @@
+I need you to create for my school project a working prototype of food recommendation web application platform using Open Food Facts database.
+
+The name of the platform will be BiteRec.
+
+I have provided you with these files with more info and context. The files are:
+- Project assignment description
+- Research paper that my team made. The functionality of the platform should be based on findings from this research paper.
+- 4 presentations + useful links
+- File with examples of machine learning to use on Open Food Facts database (csv file)
+- Jupyter notebook with examples of Machine learning
+- Requirements and use cases for the platform
+- Short version (only 1000 products) of csv file from open food facts (as a example how it looks), that would be used as db or source of food data for comparison and anything else
+
+
+It should be done with Python on BE and with whatever on FE (maybe use Python on FE, too).
+It must use some Machine learning as described in provided files.
+It doesn't have to be very complex, but it must work and meet all requirements.
+It should be able to run locally as a executable program.
+It should use the csv file as a source and database for food products.
+
+So generate me all the files needed for the web app to run.
+
+I work on this project with other classmates. I have already created a GitHub repository. When you generate all the files
+I will push them to the repository so others can see them and update them if needed.
+
+Thank you.
+
