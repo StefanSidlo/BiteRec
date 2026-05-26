@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BiteRec – Transparent Food Recommendations</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    /* ── Design tokens ──────────────────────────────────── */
+    :root {
+      --green:   #2d7a4f;
+      --green-l: #e8f5ee;
+      --blue:    #1a6fb5;
+      --blue-l:  #e8f3fd;
+      --amber:   #d97706;
+      --amber-l: #fef3c7;
+      --red:     #b91c1c;
+      --red-l:   #fee2e2;
+      --gray-50: #f9fafb;
+      --gray-100:#f3f4f6;
+      --gray-200:#e5e7eb;
+      --gray-400:#9ca3af;
+      --gray-600:#4b5563;
+      --gray-800:#1f2937;
+      --white:   #ffffff;
+      --shadow:  0 2px 12px rgba(0,0,0,.09);
+      --radius:  14px;
+      --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font);
+      background: var(--gray-50);
+      color: var(--gray-800);
+      min-height: 100vh;
+    }
+
+    /* ── Header ─────────────────────────────────────────── */
+    header {
+      background: linear-gradient(135deg, #1a4d2e 0%, #2d7a4f 60%, #1a6fb5 100%);
+      color: white;
+      padding: 0 24px;
+    }
+    .header-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 0;
+    }
+    .logo { display: flex; align-items: center; gap: 10px; }
+    .logo-icon { font-size: 32px; }
+    .logo h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.5px; }
+    .logo p { font-size: 12px; opacity: 0.8; margin-top: 1px; }
+    .header-badge {
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+
+    /* ── Main layout ─────────────────────────────────────── */
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 32px 24px 64px;
+    }
+
+    /* ── Search section ──────────────────────────────────── */
+    .search-section {
+      background: var(--white);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 28px 32px;
+      margin-bottom: 24px;
+    }
+    .search-section h2 {
+      font-size: 18px; font-weight: 600; margin-bottom: 16px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .search-row {
+      display: flex; gap: 10px; margin-bottom: 20px;
+    }
+    .search-input {
+      flex: 1; padding: 12px 16px; border: 2px solid var(--gray-200);
+      border-radius: 10px; font-size: 15px; font-family: var(--font);
+      transition: border-color .2s;
+    }
+    .search-input:focus { outline: none; border-color: var(--green); }
+    .btn {
+      padding: 12px 22px; border: none; border-radius: 10px;
+      font-size: 14px; font-weight: 600; cursor: pointer;
+      transition: all .15s; display: flex; align-items: center; gap: 6px;
+    }
+    .btn-primary { background: var(--green); color: white; }
+    .btn-primary:hover { background: #235f3e; }
+    .btn-outline {
+      background: transparent; color: var(--gray-600);
+      border: 2px solid var(--gray-200);
+    }
+    .btn-outline:hover { background: var(--gray-100); }
+
+    /* ── Controls ────────────────────────────────────────── */
+    .controls-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-top: 4px;
+    }
+    .control-group label {
+      display: block; font-size: 13px; font-weight: 600;
+      color: var(--gray-600); margin-bottom: 8px;
+    }
+    .slider-wrapper {
+      display: flex; align-items: center; gap: 10px;
+    }
+    .slider-label { font-size: 12px; color: var(--gray-600); white-space: nowrap; }
+    input[type="range"] {
+      flex: 1; accent-color: var(--green); cursor: pointer;
+    }
+    .slider-value {
+      font-size: 13px; font-weight: 700;
+      background: var(--green-l); color: var(--green);
+      padding: 2px 8px; border-radius: 6px; min-width: 80px; text-align: center;
+    }
+
+    .allergen-input {
+      width: 100%; padding: 10px 14px; border: 2px solid var(--gray-200);
+      border-radius: 8px; font-size: 14px; font-family: var(--font);
+    }
+    .allergen-input:focus { outline: none; border-color: var(--amber); }
+
+    .filter-checks { display: flex; flex-wrap: wrap; gap: 8px; }
+    .filter-chip {
+      display: flex; align-items: center; gap: 5px;
+      padding: 5px 12px; border: 2px solid var(--gray-200);
+      border-radius: 20px; font-size: 12px; font-weight: 600;
+      cursor: pointer; transition: all .15s; background: white;
+      color: var(--gray-600);
+    }
+    .filter-chip input { display: none; }
+    .filter-chip:has(input:checked) {
+      border-color: var(--green); background: var(--green-l); color: var(--green);
+    }
+
+    /* ── Search results dropdown ─────────────────────────── */
+    .search-results-container { position: relative; }
+    .search-results {
+      position: absolute; top: 0; left: 0; right: 0; z-index: 100;
+      background: white; border-radius: 10px;
+      box-shadow: 0 8px 30px rgba(0,0,0,.15);
+      border: 1px solid var(--gray-200); max-height: 320px; overflow-y: auto;
+    }
+    .result-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 16px; cursor: pointer; border-bottom: 1px solid var(--gray-100);
+      transition: background .1s;
+    }
+    .result-item:last-child { border-bottom: none; }
+    .result-item:hover { background: var(--gray-50); }
+    .result-name { font-size: 14px; font-weight: 600; }
+    .result-meta { font-size: 12px; color: var(--gray-400); margin-top: 1px; }
+    .result-grades { display: flex; gap: 5px; margin-left: auto; }
+
+    /* ── Nutriscore / Eco badges ─────────────────────────── */
+    .grade-badge {
+      width: 28px; height: 28px; border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 12px; color: white;
+      flex-shrink: 0;
+    }
+    .grade-A, .grade-A-plus { background: #038141; }
+    .grade-B { background: #85BB2F; }
+    .grade-C { background: #FECB02; color: #333; }
+    .grade-D { background: #EE8100; }
+    .grade-E, .grade-F { background: #E63E11; }
+    .grade-unknown, .grade-N\/A, .grade-\? { background: #9ca3af; }
+
+    /* ── Recommendations ─────────────────────────────────── */
+    #results-section { display: none; }
+    .results-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    .results-header h2 { font-size: 20px; font-weight: 700; }
+    .searched-label {
+      font-size: 12px; color: var(--gray-400); margin-top: 2px;
+    }
+
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+
+    .product-card {
+      background: white; border-radius: var(--radius);
+      box-shadow: var(--shadow); overflow: hidden;
+      border: 2px solid transparent; transition: border-color .2s, transform .15s;
+      display: flex; flex-direction: column;
+    }
+    .product-card:hover { transform: translateY(-2px); }
+    .card-searched { border-color: var(--gray-200); }
+    .card-health { border-color: var(--blue); }
+    .card-eco { border-color: var(--green); }
+
+    .card-header {
+      padding: 14px 18px 10px; border-bottom: 1px solid var(--gray-100);
+      display: flex; align-items: flex-start; gap: 10px;
+    }
+    .card-header-icon { font-size: 20px; flex-shrink: 0; }
+    .card-type-label {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.8px;
+      text-transform: uppercase; opacity: 0.7;
+    }
+    .card-type-health { color: var(--blue); }
+    .card-type-eco { color: var(--green); }
+    .card-type-searched { color: var(--gray-600); }
+    .card-name {
+      font-size: 15px; font-weight: 700; margin-top: 2px;
+      line-height: 1.3;
+    }
+    .card-brand { font-size: 12px; color: var(--gray-400); margin-top: 2px; }
+
+    .card-scores {
+      display: flex; gap: 8px; padding: 12px 18px;
+      background: var(--gray-50); border-bottom: 1px solid var(--gray-100);
+    }
+    .score-item {
+      display: flex; align-items: center; gap: 6px;
+    }
+    .score-item span { font-size: 11px; color: var(--gray-600); font-weight: 600; }
+
+    .card-nutrients {
+      padding: 12px 18px; display: grid;
+      grid-template-columns: repeat(3, 1fr); gap: 8px;
+      flex: 1;
+    }
+    .nutrient {
+      display: flex; flex-direction: column; align-items: center;
+      background: var(--gray-50); border-radius: 8px; padding: 8px 4px;
+    }
+    .nutrient-val { font-size: 15px; font-weight: 700; }
+    .nutrient-lbl { font-size: 10px; color: var(--gray-400); margin-top: 1px; }
+
+    .card-explanation {
+      margin: 0 18px 14px; padding: 10px 14px;
+      border-radius: 8px; font-size: 12px; line-height: 1.5;
+    }
+    .expl-health { background: var(--blue-l); color: #1a4a7a; }
+    .expl-eco { background: var(--green-l); color: #1a4a2e; }
+
+    .card-source {
+      padding: 8px 18px 12px;
+      display: flex; align-items: center; gap: 5px;
+      font-size: 11px; color: var(--gray-400);
+    }
+    .card-source a { color: var(--blue); text-decoration: none; font-weight: 600; }
+    .card-source a:hover { text-decoration: underline; }
+
+    /* ── Radar chart section ─────────────────────────────── */
+    .chart-section {
+      background: white; border-radius: var(--radius);
+      box-shadow: var(--shadow); padding: 28px 32px; margin-top: 24px;
+    }
+    .chart-section h3 {
+      font-size: 16px; font-weight: 700; margin-bottom: 20px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .chart-container { max-width: 480px; margin: 0 auto; }
+
+    /* ── Loading / Empty states ──────────────────────────── */
+    .loading {
+      text-align: center; padding: 32px; color: var(--gray-400);
+    }
+    .spinner {
+      width: 36px; height: 36px; border: 3px solid var(--gray-200);
+      border-top-color: var(--green); border-radius: 50%;
+      animation: spin .6s linear infinite; margin: 0 auto 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .empty-state {
+      text-align: center; padding: 48px 24px; color: var(--gray-400);
+    }
+    .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+    .empty-state p { font-size: 15px; }
+
+    /* ── Hero intro ──────────────────────────────────────── */
+    .hero {
+      text-align: center; padding: 40px 24px 32px;
+    }
+    .hero h2 { font-size: 28px; font-weight: 800; color: var(--green); margin-bottom: 12px; }
+    .hero p { font-size: 15px; color: var(--gray-600); max-width: 560px; margin: 0 auto 8px; }
+    .hero-pills {
+      display: flex; flex-wrap: wrap; gap: 8px;
+      justify-content: center; margin-top: 16px;
+    }
+    .hero-pill {
+      background: white; border: 1px solid var(--gray-200); border-radius: 20px;
+      padding: 5px 14px; font-size: 12px; font-weight: 600; color: var(--gray-600);
+    }
+
+    .source-note {
+      text-align: center; margin-top: 32px; font-size: 12px; color: var(--gray-400);
+    }
+    .source-note a { color: var(--blue); }
+
+    /* ── Responsive ──────────────────────────────────────── */
+    @media (max-width: 720px) {
+      .cards-grid { grid-template-columns: 1fr; }
+      .controls-grid { grid-template-columns: 1fr; }
+      .search-row { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="logo">
+      <span class="logo-icon">🥗</span>
+      <div>
+        <h1>BiteRec</h1>
+        <p>Transparent Multi-Objective Food Recommendations</p>
+      </div>
+    </div>
+    <span class="header-badge">Powered by Open Food Facts · XAI</span>
+  </div>
+</header>
+
+<main>
+
+  <!-- Hero -->
+  <div class="hero" id="hero">
+    <h2>Find a better bite 🌿</h2>
+    <p>Search any food product and instantly discover alternatives that are
+       <strong>better for your health</strong> or <strong>better for the planet</strong> —
+       with transparent, plain-language explanations.</p>
+    <div class="hero-pills">
+      <span class="hero-pill">⚡ No registration required</span>
+      <span class="hero-pill">🔍 Explainable AI</span>
+      <span class="hero-pill">🌍 Eco-metrics in real units</span>
+      <span class="hero-pill">🛡️ Allergen filters</span>
+    </div>
+  </div>
+
+  <!-- Search & Controls -->
+  <div class="search-section">
+    <h2>🔍 Search a product</h2>
+
+    <div class="search-results-container">
+      <div class="search-row">
+        <input type="text" id="searchInput" class="search-input"
+               placeholder='e.g. "milk", "pasta", "granola"…' autocomplete="off" />
+        <button class="btn btn-primary" onclick="doSearch()">
+          Search
+        </button>
+      </div>
+      <div id="searchResults" class="search-results" style="display:none"></div>
+    </div>
+
+    <div class="controls-grid">
+      <!-- Slider -->
+      <div class="control-group">
+        <label>⚖️ My priority: Health vs Ecology</label>
+        <div class="slider-wrapper">
+          <span class="slider-label">🌍 Eco</span>
+          <input type="range" id="prioritySlider" min="0" max="100" value="70"
+                 oninput="updateSlider(this.value)" />
+          <span class="slider-label">💚 Health</span>
+        </div>
+        <div style="text-align:center; margin-top:6px;">
+          <span class="slider-value" id="sliderLabel">70% Health / 30% Eco</span>
+        </div>
+      </div>
+
+      <!-- Allergens -->
+      <div class="control-group">
+        <label>🚫 Allergen filter (hard constraint)</label>
+        <input type="text" id="allergenInput" class="allergen-input"
+               placeholder='e.g. "nuts, gluten, milk"' />
+        <div style="font-size:11px; color:var(--gray-400); margin-top:5px;">
+          Products with these allergens will never appear in recommendations.
+        </div>
+      </div>
+
+      <!-- Nutritional filters -->
+      <div class="control-group">
+        <label>🔧 Nutritional filters</label>
+        <div class="filter-checks">
+          <label class="filter-chip">
+            <input type="checkbox" id="f_protein"> 💪 High Protein (≥10g)
+          </label>
+          <label class="filter-chip">
+            <input type="checkbox" id="f_sugar"> 🍬 Low Sugar (≤5g)
+          </label>
+        </div>
+      </div>
+
+      <!-- Eco filters -->
+      <div class="control-group">
+        <label>♻️ Ecological filters</label>
+        <div class="filter-checks">
+          <label class="filter-chip">
+            <input type="checkbox" id="f_organic"> 🌱 Organic / Bio
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Results section -->
+  <div id="results-section">
+    <div class="results-header">
+      <div>
+        <h2>Recommendations</h2>
+        <div class="searched-label" id="searchedLabel"></div>
+      </div>
+      <button class="btn btn-outline" onclick="clearResults()">✕ Clear</button>
+    </div>
+
+    <div id="cardsContainer" class="cards-grid"></div>
+
+    <!-- Radar chart -->
+    <div class="chart-section">
+      <h3>📊 Comparison across key dimensions</h3>
+      <div class="chart-container">
+        <canvas id="radarChart"></canvas>
+      </div>
+      <p style="font-size:11px; color:var(--gray-400); text-align:center; margin-top:12px;">
+        Scores are normalised 0–100. Nutri-Score: A=100, B=75, C=50, D=25, E=0.
+        Eco-Score: A+=100 … F=0. Nutrients scaled relative to typical daily reference values.
+      </p>
+    </div>
+
+    <div class="source-note">
+      Data source: <a href="https://world.openfoodfacts.org" target="_blank">Open Food Facts</a>
+      – Open database licensed under <a href="https://opendatacommons.org/licenses/odbl/" target="_blank">ODbL</a>.
+      Nutritional and ecological data are crowdsourced and may be incomplete.
+    </div>
+  </div>
+
+  <!-- Empty hero shown until first search -->
+  <div id="emptyState" class="empty-state">
+    <div class="icon">🥦</div>
+    <p>Enter a product name above to get started.</p>
+  </div>
+
+</main>
+
+<script>
+/* ── State ──────────────────────────────────────────────────────────────── */
+const API = '';  // same-origin; change to 'http://localhost:8000' if needed
+let radarChartInstance = null;
+let currentProductIdx = null;
+let searchDebounce = null;
+
+/* ── Slider ─────────────────────────────────────────────────────────────── */
+function updateSlider(val) {
+  const h = parseInt(val);
+  const e = 100 - h;
+  document.getElementById('sliderLabel').textContent = `${h}% Health / ${e}% Eco`;
+  if (currentProductIdx !== null) {
+    loadRecommendations(currentProductIdx);
+  }
+}
+
+/* ── Search ─────────────────────────────────────────────────────────────── */
+const searchInput = document.getElementById('searchInput');
+
+searchInput.addEventListener('input', () => {
+  clearTimeout(searchDebounce);
+  const q = searchInput.value.trim();
+  if (q.length < 2) { hideDropdown(); return; }
+  searchDebounce = setTimeout(() => fetchSearch(q), 300);
+});
+
+searchInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { doSearch(); }
+  if (e.key === 'Escape') { hideDropdown(); }
+});
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.search-results-container')) hideDropdown();
+});
+
+async function doSearch() {
+  const q = searchInput.value.trim();
+  if (!q) return;
+  fetchSearch(q);
+}
+
+async function fetchSearch(q) {
+  try {
+    const res = await fetch(`${API}/api/search?q=${encodeURIComponent(q)}`);
+    const data = await res.json();
+    renderDropdown(data.results);
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+function renderDropdown(results) {
+  const el = document.getElementById('searchResults');
+  if (!results || results.length === 0) {
+    el.innerHTML = '<div class="result-item"><div class="result-name" style="color:var(--gray-400)">No products found</div></div>';
+    el.style.display = 'block';
+    return;
+  }
+  el.innerHTML = results.map(r => `
+    <div class="result-item" onclick="selectProduct(${r.idx}, '${escHtml(r.name)}')">
+      <div style="flex:1">
+        <div class="result-name">${escHtml(r.name)}</div>
+        <div class="result-meta">${escHtml(r.brand || '')} ${r.category && r.category !== 'unknown' ? '· ' + escHtml(r.category) : ''}</div>
+      </div>
+      <div class="result-grades">
+        ${gradeHtml(r.nutriscore_grade, 'N')}
+        ${gradeHtml(r.eco_grade, 'E')}
+      </div>
+    </div>
+  `).join('');
+  el.style.display = 'block';
+}
+
+function hideDropdown() {
+  document.getElementById('searchResults').style.display = 'none';
+}
+
+function selectProduct(idx, name) {
+  hideDropdown();
+  searchInput.value = name;
+  currentProductIdx = idx;
+  loadRecommendations(idx);
+}
+
+/* ── Recommendations ─────────────────────────────────────────────────────── */
+async function loadRecommendations(idx) {
+  showLoading();
+  const h = parseInt(document.getElementById('prioritySlider').value) / 100;
+  const allergens = document.getElementById('allergenInput').value;
+  const highProtein = document.getElementById('f_protein').checked;
+  const lowSugar = document.getElementById('f_sugar').checked;
+  const organic = document.getElementById('f_organic').checked;
+
+  const params = new URLSearchParams({
+    health_weight: h.toFixed(2),
+    allergens,
+    high_protein: highProtein,
+    low_sugar: lowSugar,
+    organic,
+  });
+
+  try {
+    const res = await fetch(`${API}/api/recommend/${idx}?${params}`);
+    const data = await res.json();
+    renderResults(data);
+  } catch (err) {
+    document.getElementById('cardsContainer').innerHTML =
+      '<div class="empty-state"><p>⚠️ Error fetching recommendations. Is the server running?</p></div>';
+    console.error(err);
+  }
+}
+
+function showLoading() {
+  document.getElementById('hero').style.display = 'none';
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('results-section').style.display = 'block';
+  document.getElementById('cardsContainer').innerHTML =
+    '<div class="loading" style="grid-column:1/-1"><div class="spinner"></div><p>Finding the best alternatives…</p></div>';
+}
+
+function renderResults(data) {
+  const { searched, better_for_you, better_for_earth } = data;
+
+  document.getElementById('searchedLabel').textContent =
+    `Showing alternatives for: ${searched.name}`;
+
+  const cards = [
+    buildCard(searched, 'searched', null),
+    buildCard(better_for_you, 'health', better_for_you.explanation),
+    buildCard(better_for_earth, 'eco', better_for_earth.explanation),
+  ];
+  document.getElementById('cardsContainer').innerHTML = cards.join('');
+  buildRadar(searched, better_for_you, better_for_earth);
+}
+
+function buildCard(p, type, explanation) {
+  const typeLabels = {
+    searched: { label: 'Your product', icon: '📦', cls: 'searched' },
+    health:   { label: 'Better for You 💚', icon: '💪', cls: 'health' },
+    eco:      { label: 'Better for Earth 🌍', icon: '🌿', cls: 'eco' },
+  };
+  const t = typeLabels[type];
+
+  const explHtml = explanation
+    ? `<div class="card-explanation expl-${type === 'health' ? 'health' : 'eco'}">
+        <strong>Why?</strong> ${escHtml(explanation)}
+       </div>`
+    : '';
+
+  const offLink = p.url
+    ? `<a href="${escHtml(p.url)}" target="_blank">View on Open Food Facts ↗</a>`
+    : 'Open Food Facts';
+
+  return `
+    <div class="product-card card-${t.cls}">
+      <div class="card-header">
+        <span class="card-header-icon">${t.icon}</span>
+        <div style="flex:1">
+          <div class="card-type-label card-type-${t.cls}">${t.label}</div>
+          <div class="card-name">${escHtml(p.name)}</div>
+          ${p.brand ? `<div class="card-brand">${escHtml(p.brand)}</div>` : ''}
+        </div>
+      </div>
+      <div class="card-scores">
+        <div class="score-item">
+          ${gradeHtml(p.nutriscore_grade, 'N')}
+          <span>Nutri-Score ${p.nutriscore_grade.toUpperCase()}</span>
+        </div>
+        <div class="score-item" style="margin-left:10px">
+          ${gradeHtml(p.eco_grade, 'E')}
+          <span>Eco ${p.eco_grade.toUpperCase()}</span>
+        </div>
+      </div>
+      <div class="card-nutrients">
+        ${nutrientCell(p.energy_kcal, 'kcal', 'Energy')}
+        ${nutrientCell(p.proteins, 'g', 'Protein')}
+        ${nutrientCell(p.fat, 'g', 'Fat')}
+        ${nutrientCell(p.sugars, 'g', 'Sugars')}
+        ${nutrientCell(p.fiber, 'g', 'Fibre')}
+        ${nutrientCell(p.salt, 'g', 'Salt')}
+      </div>
+      ${explHtml}
+      <div class="card-source">
+        🔗 Source: ${offLink}
+      </div>
+    </div>
+  `;
+}
+
+function nutrientCell(val, unit, label) {
+  const display = val !== null && val !== undefined ? `${val}${unit}` : '–';
+  return `
+    <div class="nutrient">
+      <span class="nutrient-val">${display}</span>
+      <span class="nutrient-lbl">${label}</span>
+    </div>`;
+}
+
+/* ── Radar chart ─────────────────────────────────────────────────────────── */
+function buildRadar(searched, health, eco) {
+  if (radarChartInstance) radarChartInstance.destroy();
+
+  // Normalize nutrients to 0-100 scale (rough daily reference values)
+  const DRV = { energy_kcal: 2000, proteins: 50, fat: 70, sugars: 90, fiber: 25, health_score: 100, eco_score: 100 };
+  function norm(p, key) {
+    const v = p[key];
+    if (v === null || v === undefined) return 0;
+    return Math.min(100, (v / DRV[key]) * 100);
+  }
+
+  const labels = ['Nutri-Score', 'Eco-Score', 'Protein', 'Fibre', 'Low Sugar', 'Low Fat'];
+
+  function toRadarData(p) {
+    return [
+      p.health_score,
+      p.eco_score,
+      Math.min(100, (p.proteins / 30) * 100),
+      Math.min(100, (p.fiber !== null ? p.fiber : 0) / 10 * 100),
+      Math.max(0, 100 - Math.min(100, (p.sugars / 50) * 100)),
+      Math.max(0, 100 - Math.min(100, (p.fat / 70) * 100)),
+    ].map(v => Math.round(v));
+  }
+
+  const ctx = document.getElementById('radarChart').getContext('2d');
+  radarChartInstance = new Chart(ctx, {
+    type: 'radar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: `${searched.name.slice(0,20)}…` ,
+          data: toRadarData(searched),
+          backgroundColor: 'rgba(156,163,175,0.2)',
+          borderColor: '#9ca3af',
+          pointBackgroundColor: '#9ca3af',
+          borderWidth: 2,
+          pointRadius: 4,
+        },
+        {
+          label: 'Better for You 💚',
+          data: toRadarData(health),
+          backgroundColor: 'rgba(26,111,181,0.15)',
+          borderColor: '#1a6fb5',
+          pointBackgroundColor: '#1a6fb5',
+          borderWidth: 2,
+          pointRadius: 4,
+        },
+        {
+          label: 'Better for Earth 🌍',
+          data: toRadarData(eco),
+          backgroundColor: 'rgba(45,122,79,0.15)',
+          borderColor: '#2d7a4f',
+          pointBackgroundColor: '#2d7a4f',
+          borderWidth: 2,
+          pointRadius: 4,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { size: 12 }, padding: 16 } },
+      },
+      scales: {
+        r: {
+          min: 0, max: 100,
+          ticks: { display: false },
+          pointLabels: { font: { size: 11 } },
+          grid: { color: '#e5e7eb' },
+          angleLines: { color: '#e5e7eb' },
+        },
+      },
+    },
+  });
+}
+
+/* ── Helpers ─────────────────────────────────────────────────────────────── */
+function clearResults() {
+  document.getElementById('results-section').style.display = 'none';
+  document.getElementById('emptyState').style.display = 'block';
+  document.getElementById('hero').style.display = 'block';
+  searchInput.value = '';
+  currentProductIdx = null;
+}
+
+function gradeHtml(grade, prefix) {
+  const g = (grade || 'unknown').toLowerCase().replace('+', '-plus');
+  const label = (grade || '?').toUpperCase();
+  return `<div class="grade-badge grade-${g}" title="${prefix}-Score ${label}">${label}</div>`;
+}
+
+function escHtml(s) {
+  if (!s) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// Also re-run recommendations when filters change
+['f_protein', 'f_sugar', 'f_organic'].forEach(id => {
+  document.getElementById(id).addEventListener('change', () => {
+    if (currentProductIdx !== null) loadRecommendations(currentProductIdx);
+  });
+});
+document.getElementById('allergenInput').addEventListener('change', () => {
+  if (currentProductIdx !== null) loadRecommendations(currentProductIdx);
+});
+</script>
+</body>
+</html>
