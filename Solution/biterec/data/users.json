@@ -1,0 +1,13 @@
+{
+ "john doe": {
+  "password_hash": "scrypt:32768:8:1$lOMj6v21HT39v0ub$b286d7df8e84f978799275d1693c087f235eea03ae38a579d8357845515bdee9638f29097b99b4414699fdf7df65502905df32410133c0802422a1b66e138786",
+  "allergens": [],
+  "health_weight": 0.5,
+  "show_health": true,
+  "show_eco": true,
+  "onboarded": true,
+  "favorites": [
+   267
+  ]
+ }
+}

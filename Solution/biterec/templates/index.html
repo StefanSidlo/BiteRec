@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BiteRec &middot; Transparent Food Recommendations</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+</head>
+<body>
+  <!-- ============================ HEADER ============================ -->
+  <header class="topbar">
+    <div class="brand" onclick="App.go('discover')">
+      <span class="brand-mark">&#127807;</span>
+      <span class="brand-name">Bite<span>Rec</span></span>
+    </div>
+    <nav class="nav" id="nav">
+      <button class="nav-link active" data-view="discover" onclick="App.go('discover')">Discover</button>
+      <button class="nav-link" data-view="insights" onclick="App.go('insights')">Insights</button>
+      <button class="nav-link" data-view="favorites" onclick="App.go('favorites')">Favourites</button>
+      <button class="nav-link" data-view="account" onclick="App.go('account')">
+        <span id="account-label">Sign in</span>
+      </button>
+    </nav>
+    <button class="hamburger" id="hamburger" aria-label="Menu" onclick="App.toggleNav()">
+      <span></span><span></span><span></span>
+    </button>
+  </header>
+
+  <main>
+    <!-- ========================= DISCOVER ========================= -->
+    <section id="view-discover" class="view active">
+      <div class="hero">
+        <h1 class="hero-title">Eat well. <em>Tread lightly.</em></h1>
+        <p class="hero-sub">Search a food and instantly see a healthier and a greener alternative &mdash; with the reasoning shown, never hidden.</p>
+
+        <div class="searchwrap">
+          <div class="searchbar">
+            <svg class="search-icon" viewBox="0 0 24 24"><path d="M10 2a8 8 0 105.3 14l5.4 5.4 1.4-1.4-5.4-5.4A8 8 0 0010 2zm0 2a6 6 0 110 12 6 6 0 010-12z"/></svg>
+            <input id="search-input" type="text" autocomplete="off" placeholder="Try &ldquo;chocolate&rdquo;, &ldquo;yogurt&rdquo;, &ldquo;cereal&rdquo;&hellip;" />
+            <button class="search-clear" id="search-clear" onclick="App.clearSearch()" aria-label="Clear">&times;</button>
+          </div>
+          <div class="autocomplete" id="autocomplete" hidden></div>
+        </div>
+
+        <p class="no-login-note">Your saved allergens and health/eco priority &mdash; set in
+          <a href="#" onclick="App.go('account');return false">Account</a> &mdash; shape every result. Data from
+          <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a>.</p>
+      </div>
+
+      <div class="discover-body">
+        <!-- ---------- Filters ---------- -->
+        <aside class="filters" id="filters">
+          <div class="filters-head">
+            <h2>Quick filters
+              <span class="tip" data-tip="Filters update the results live &mdash; no need to search again. Your allergens and health/eco priority live in Account.">?</span>
+            </h2>
+            <button class="link-btn" onclick="App.resetFilters()">Reset</button>
+          </div>
+
+          <div class="filter-group">
+            <label class="filter-title">Nutrition</label>
+            <label class="check"><input type="checkbox" data-filter="high_protein"> High protein</label>
+            <label class="check"><input type="checkbox" data-filter="low_sugar"> Low sugar</label>
+            <label class="check"><input type="checkbox" data-filter="low_salt"> Low salt</label>
+            <label class="check"><input type="checkbox" data-filter="low_satfat"> Low saturated fat</label>
+            <label class="check"><input type="checkbox" data-filter="high_fibre"> High fibre</label>
+            <label class="check"><input type="checkbox" data-filter="low_calorie"> Low calorie</label>
+          </div>
+
+          <div class="filter-group">
+            <label class="filter-title">Ecology &amp; processing</label>
+            <label class="check"><input type="checkbox" data-filter="low_co2"> Low CO&#8322;</label>
+            <label class="check"><input type="checkbox" data-filter="organic"> Organic</label>
+            <label class="check"><input type="checkbox" data-filter="few_additives"> Minimally processed
+              <span class="tip" data-tip="No listed additives, or NOVA processing group 1&ndash;2.">?</span></label>
+          </div>
+
+          <div class="filter-group">
+            <label class="filter-title">Nutrient limits (per 100 g)
+              <span class="tip" data-tip="Set exact thresholds. They apply live to both the results and the recommended alternatives.">?</span>
+            </label>
+            <div class="nslider-row">
+              <div class="nslider-head"><span>Max sugar</span><span class="nslider-out" id="sl-sugar-out">any</span></div>
+              <input type="range" class="nslider" id="sl-sugar" min="0" max="50" step="1" value="50" data-dir="max" data-off="50" data-unit=" g">
+            </div>
+            <div class="nslider-row">
+              <div class="nslider-head"><span>Min protein</span><span class="nslider-out" id="sl-protein-out">any</span></div>
+              <input type="range" class="nslider" id="sl-protein" min="0" max="40" step="1" value="0" data-dir="min" data-off="0" data-unit=" g">
+            </div>
+            <div class="nslider-row">
+              <div class="nslider-head"><span>Max salt</span><span class="nslider-out" id="sl-salt-out">any</span></div>
+              <input type="range" class="nslider" id="sl-salt" min="0" max="5" step="0.1" value="5" data-dir="max" data-off="5" data-unit=" g">
+            </div>
+            <div class="nslider-row">
+              <div class="nslider-head"><span>Max saturated fat</span><span class="nslider-out" id="sl-satfat-out">any</span></div>
+              <input type="range" class="nslider" id="sl-satfat" min="0" max="30" step="0.5" value="30" data-dir="max" data-off="30" data-unit=" g">
+            </div>
+            <div class="nslider-row">
+              <div class="nslider-head"><span>Max energy</span><span class="nslider-out" id="sl-energy-out">any</span></div>
+              <input type="range" class="nslider" id="sl-energy" min="0" max="600" step="10" value="600" data-dir="max" data-off="600" data-unit=" kcal">
+            </div>
+            <div class="nslider-row">
+              <div class="nslider-head"><span>Min fibre</span><span class="nslider-out" id="sl-fibre-out">any</span></div>
+              <input type="range" class="nslider" id="sl-fibre" min="0" max="15" step="0.5" value="0" data-dir="min" data-off="0" data-unit=" g">
+            </div>
+          </div>
+
+          <div class="filter-group">
+            <label class="filter-title">Minimum grades</label>
+            <div class="grade-pick">
+              <span>Nutri-Score &ge;</span>
+              <select id="min-nutri"><option value="">any</option><option>A</option><option>B</option><option>C</option><option>D</option></select>
+            </div>
+            <div class="grade-pick">
+              <span>Eco-Score &ge;</span>
+              <select id="min-eco"><option value="">any</option><option>A</option><option>B</option><option>C</option><option>D</option></select>
+            </div>
+          </div>
+
+          <p class="filter-foot">Allergens &amp; health/eco priority are set in
+            <a href="#" onclick="App.go('account');return false">Account</a> and applied automatically.</p>
+        </aside>
+
+        <!-- ---------- Results / recommendation ---------- -->
+        <div class="results-col">
+          <div id="rec-panel" class="rec-panel" hidden></div>
+          <div id="results" class="results-grid"></div>
+          <div id="results-empty" class="empty" hidden></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================= INSIGHTS ========================= -->
+    <section id="view-insights" class="view">
+      <h1 class="page-title">Dataset &amp; model insights</h1>
+      <p class="page-sub">A transparent look at the products and the machine-learning model powering BiteRec.</p>
+      <div class="stat-row" id="stat-row"></div>
+
+      <div class="insight-note">
+        <h3>How the model works <span class="leaf">&#129302;</span></h3>
+        <p>A <b>Random-Forest classifier</b> is trained on seven nutrients (energy, sugars, fat, saturated fat,
+        protein, salt, fibre) to predict a product's Nutri-Score grade. We then read the model two ways:
+        its class probabilities give a smooth <b>0&ndash;100 health score</b> for ranking, and
+        <b>SHAP</b> (SHapley Additive exPlanations) reveals exactly how much each nutrient pushed a given
+        prediction &mdash; the same approach used in our <code>off_nutriscore_01.ipynb</code> notebook. The two
+        charts below show which nutrients matter most overall.</p>
+      </div>
+
+      <div class="chart-grid">
+        <div class="chart-card"><h3>RF feature importance
+          <span class="tip" data-tip="How often each nutrient is used to split trees in the Random Forest.">?</span></h3>
+          <canvas id="c-imp"></canvas></div>
+        <div class="chart-card"><h3>SHAP global importance (mean |&phi;|)
+          <span class="tip" data-tip="Average absolute SHAP value per nutrient across the catalogue — the model-agnostic measure of overall impact.">?</span></h3>
+          <canvas id="c-shap"></canvas></div>
+        <div class="chart-card"><h3>What drives the Eco-Score model
+          <span class="tip" data-tip="Importance of each attribute in the learned Eco-Score model. Food category dominates, as it does in the real Eco-Score.">?</span></h3>
+          <canvas id="c-eco-imp"></canvas></div>
+        <div class="chart-card"><h3>Nutri-Score distribution</h3><canvas id="c-nutri"></canvas></div>
+        <div class="chart-card"><h3>Eco-Score distribution</h3><canvas id="c-eco"></canvas></div>
+        <div class="chart-card"><h3>Products by category</h3><canvas id="c-cat"></canvas></div>
+        <div class="chart-card"><h3>Avg. sugar by Nutri-Score
+          <span class="tip" data-tip="Higher grades (A) carry far less sugar — a sanity check that the data is coherent.">?</span></h3>
+          <canvas id="c-sugar"></canvas></div>
+        <div class="chart-card"><h3>Avg. estimated CO&#8322; by Eco-Score</h3><canvas id="c-co2"></canvas></div>
+      </div>
+    </section>
+
+    <!-- ========================= FAVOURITES ========================= -->
+    <section id="view-favorites" class="view">
+      <h1 class="page-title">Your favourites</h1>
+      <p class="page-sub" id="fav-sub">Products you save appear here.</p>
+      <div id="fav-grid" class="results-grid"></div>
+    </section>
+
+    <!-- ========================= ACCOUNT ========================= -->
+    <section id="view-account" class="view">
+      <div id="account-anon">
+        <h1 class="page-title">Welcome to BiteRec</h1>
+        <p class="page-sub">Create a free account (or sign in) to start finding healthier, greener food. Your allergens, health/eco priority, and favourites are saved across sessions.</p>
+        <div class="auth-card">
+          <div class="auth-tabs">
+            <button class="auth-tab" id="tab-login" onclick="App.authTab('login')">Sign in</button>
+            <button class="auth-tab active" id="tab-register" onclick="App.authTab('register')">Create account</button>
+          </div>
+          <input id="auth-user" type="text" placeholder="Username" autocomplete="username" />
+          <input id="auth-pass" type="password" placeholder="Password (min 4 characters)" autocomplete="current-password" />
+          <p class="auth-msg" id="auth-msg"></p>
+          <button class="btn-primary" id="auth-submit" onclick="App.submitAuth()">Create account</button>
+          <p class="auth-foot muted small">Accounts are stored locally in a file (passwords are hashed). No database, no email needed.</p>
+        </div>
+      </div>
+
+      <div id="account-user" hidden>
+        <h1 class="page-title">Hi, <span id="acc-name"></span> <span class="leaf">&#127807;</span></h1>
+        <p class="page-sub">Your preferences are applied automatically to every search and recommendation.</p>
+
+        <div id="onboard-banner" class="onboard-banner" hidden>
+          <b>&#128075; Welcome to BiteRec!</b> Before you start, set your allergens and your health/eco priority below, then tap <b>Save preferences</b> — we'll take you straight to search.
+        </div>
+
+        <div class="acc-grid">
+          <div class="acc-card">
+            <h3>Recommendations to show
+              <span class="tip" data-tip="Choose which alternatives appear. If you enable only one, BiteRec shows your top 3 matches for it, ranked best first.">?</span>
+            </h3>
+            <label class="switch"><input type="checkbox" id="tg-health" checked> <span class="sw-track"></span> Show a healthier alternative</label>
+            <label class="switch"><input type="checkbox" id="tg-eco" checked> <span class="sw-track"></span> Show a greener alternative</label>
+            <p class="muted small">Enable both for one of each; enable just one to get its top 3, ranked.</p>
+          </div>
+
+          <div class="acc-card">
+            <h3>Priority
+              <span class="tip" data-tip="Your saved default balance between health and ecology.">?</span>
+            </h3>
+            <div class="slider-row">
+              <span class="slider-end">Eco</span>
+              <input type="range" id="acc-priority" min="0" max="100" value="70" />
+              <span class="slider-end">Health</span>
+            </div>
+            <div class="slider-readout"><span id="acc-prio-health">70%</span> health &middot; <span id="acc-prio-eco">30%</span> eco</div>
+          </div>
+
+          <div class="acc-card">
+            <h3>Allergens to avoid
+              <span class="tip" data-tip="Applied as a hard constraint in every recommendation: matching products are removed before scoring.">?</span>
+            </h3>
+            <p class="muted small">Tap a common allergen, or type your own and press Enter.</p>
+            <div class="allergen-add">
+              <input id="allergen-input" type="text" placeholder="Type an allergen, e.g. mustard" autocomplete="off" />
+              <button class="mini-btn primary" onclick="App.addAllergenText()">Add</button>
+            </div>
+            <div class="allergen-chips" id="acc-allergen-custom"></div>
+            <div class="allergen-chips" id="acc-allergen-chips"></div>
+          </div>
+        </div>
+
+        <div class="acc-actions">
+          <button class="btn-primary" onclick="App.savePrefs()">Save preferences</button>
+          <span class="save-flash" id="save-flash" hidden>Saved &#10003;</span>
+          <button class="link-btn danger" onclick="App.logout()">Sign out</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>BiteRec &middot; HCI student project</span>
+    <span>Nutrition &amp; ecology data: <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a> (ODbL). Eco footprints are estimates.</span>
+  </footer>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <!-- ========================= CHART ZOOM ========================= -->
+  <div id="chart-zoom" class="modal" hidden>
+    <div class="modal-backdrop" onclick="App.closeZoom()"></div>
+    <div class="modal-card zoom-card" role="dialog" aria-modal="true">
+      <button class="modal-close" onclick="App.closeZoom()" aria-label="Close">&times;</button>
+      <h3 id="zoom-title"></h3>
+      <div class="zoom-wrap"><canvas id="zoom-canvas"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ========================= PRODUCT DETAIL MODAL ========================= -->
+  <div id="detail-modal" class="modal" hidden>
+    <div class="modal-backdrop" onclick="App.closeDetail()"></div>
+    <div class="modal-card" role="dialog" aria-modal="true">
+      <button class="modal-close" onclick="App.closeDetail()" aria-label="Close">&times;</button>
+      <div id="detail-body"></div>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

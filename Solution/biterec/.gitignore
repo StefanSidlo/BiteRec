@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+
+# BiteRec generated / local
+data/users.json          # local file-based user store (passwords hashed, but still local)
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Optional: the raw Open Food Facts dump can be large.
+# products.json is committed so the app runs without it.
+# Uncomment the next line if you don't want the raw CSV in your repo:
+# data/*.csv
