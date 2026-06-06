@@ -117,6 +117,13 @@ const App = (() => {
     addHistory(q); hideAC(); $('#rec-panel').hidden=true; state.current=null;
     api('/api/search?q='+encodeURIComponent(q)).then(list=>{ state.results=list; renderResults(); });
   }
+  // Clear the Discover area (recommendations + results) -- used when the search
+  // bar is emptied, so nothing lingers on screen with an empty query.
+  function resetDiscover(){
+    state.current=null; state.results=[]; state.cmp=null;
+    const rp=$('#rec-panel'); if(rp) rp.hidden=true;
+    renderResults();
+  }
   function resultCard(p){
     const fav = state.favorites.has(p.id);
     return `<div class="card">
@@ -173,10 +180,11 @@ const App = (() => {
 
   function ecoUnits(p){
     const e=p.eco_metrics;
-    return `<div class="eco-units">
-      <span>&#127757; <b>~${e.co2_kg} kg</b> CO&#8322;e/kg &middot; like <b>${e.car_km} km</b> by car
-        <span class="tip" data-tip="Estimated from the Eco-Score grade and product category. Real per-product carbon data is rarely available in Open Food Facts.">?</span></span>
-      <span>&#128167; <b>~${e.water_l} L</b> water/kg</span>
+    return `<div class="eco-units compact">
+      <span>&#127757; <b>~${e.co2_kg} kg</b> CO&#8322;e/kg
+        <span class="tip" data-tip="\u2248 ${e.car_km} km driven by a petrol car. Estimated from the Eco-Score grade and product category.">?</span></span>
+      <span>&#128167; <b>~${e.water_l} L</b> water/kg
+        <span class="tip" data-tip="Estimated freshwater used to produce 1 kg of this product, derived from the Eco-Score grade and product category.">?</span></span>
     </div>`;
   }
 
@@ -297,6 +305,26 @@ const App = (() => {
       <div class="nb-text">We couldn't find a product better for <b>${label}</b> than this one in the same category. Nice pick!</div>
     </div>`;
   }
+  function renderCmpRadar(){
+    const c = state.cmp; if(!c || !c.base) return;
+    const dims = Object.keys(c.base.radar);
+    const palette = ['#2f5d43', '#1a8c4a', '#e6a23c', '#7c5cbf'];
+    const series = [{label: c.base.name.slice(0,20), data: dims.map(d=>c.base.radar[d]), color: palette[0]}];
+    c.alts.forEach((a,i)=>series.push({
+      label: (a.rank?('#'+a.rank+' '):'')+(a.kind||a.name).slice(0,20),
+      data: dims.map(d=>a.radar[d]||0), color: palette[(i+1)%palette.length]
+    }));
+    Charts.radar('cmp-radar', dims, series);
+  }
+  function setCmpView(v){
+    state.cmpView = v;
+    document.querySelectorAll('.cmp-seg').forEach(b=>b.classList.toggle('active', b.dataset.cmp===v));
+    const chart=$('#cmp-chart'), table=$('#cmp-table');
+    if(chart) chart.hidden = v!=='chart';
+    if(table) table.hidden = v!=='table';
+    if(v==='chart') renderCmpRadar();
+  }
+
   function renderRecommendation(r){
     if(r.error){ toast('Product not found'); return; }
     const base=r.base;
@@ -337,10 +365,27 @@ const App = (() => {
       </div>
 
       ${alts.length?`<div class="rec-chart-card wide">
-        <h3>Side-by-side comparison <span class="tip" data-tip="Open any product's Details to see the full SHAP explanation of its grades.">?</span></h3>
-        <div class="ct-grid">${alts.map(a=>`<div class="ct-block"><h4>${esc(a.kind)}${a.rank?` #${a.rank}`:''}</h4>${contrastTable(base,a)}</div>`).join('')}</div>
+        <div class="cmp-head">
+          <h3>Compare at a glance</h3>
+          <div class="cmp-toggle">
+            <button class="cmp-seg" data-cmp="chart" onclick="App.setCmpView('chart')">&#9733; Spider chart</button>
+            <button class="cmp-seg" data-cmp="table" onclick="App.setCmpView('table')">&#9783; Table</button>
+          </div>
+        </div>
+        <div id="cmp-chart">
+          <div class="radar-wrap big"><canvas id="cmp-radar"></canvas></div>
+          <p class="muted small" style="text-align:center">Each axis runs 0&ndash;100 and further out is always better &mdash; compare the shapes at a glance.</p>
+        </div>
+        <div id="cmp-table" hidden>
+          <div class="ct-grid">${alts.map(a=>`<div class="ct-block"><h4>${esc(a.kind)}${a.rank?` #${a.rank}`:''}</h4>${contrastTable(base,a)}</div>`).join('')}</div>
+        </div>
         <p class="muted small">Want to know <em>why</em> a product gets its grades? Tap <b>Details</b> on any card.</p>
       </div>`:''}`;
+
+    if(alts.length){
+      state.cmp = {base, alts};
+      setCmpView(state.cmpView || 'chart');
+    }
   }
   function backToResults(){ $('#rec-panel').hidden=true; state.current=null; renderResults(); }
 
@@ -634,7 +679,7 @@ const App = (() => {
   /* ---------------------------------------------------------- init */
   function init(){
     const input=$('#search-input');
-    input.addEventListener('input', e=>{ $('.searchbar').classList.toggle('has-text', !!e.target.value); suggest(e.target.value); });
+    input.addEventListener('input', e=>{ const v=e.target.value; $('.searchbar').classList.toggle('has-text', !!v); if(!v.trim()) resetDiscover(); suggest(v); });
     input.addEventListener('focus', ()=>{ if(!input.value) historyDropdown(); });
     input.addEventListener('keydown', onSearchKey);
     document.addEventListener('click', e=>{ if(!e.target.closest('.searchwrap')) hideAC(); });
@@ -664,9 +709,9 @@ const App = (() => {
 
   return { go, toggleNav, runSearch, openProduct, openDetail, closeDetail, pickHistory, openFromSuggest, removeHistory,
            backToResults, toggleFav, resetFilters, toggleAllergen, addAllergenText, selectShapGrade, onToggleChange,
-           zoomChart, closeZoom,
+           zoomChart, closeZoom, setCmpView, resetDiscover,
            authTab, submitAuth, logout, savePrefs, init, imgFallback,
-           clearSearch:()=>{ $('#search-input').value=''; $('.searchbar').classList.remove('has-text'); hideAC(); } };
+           clearSearch:()=>{ $('#search-input').value=''; $('.searchbar').classList.remove('has-text'); hideAC(); resetDiscover(); } };
 })();
 
 document.addEventListener('DOMContentLoaded', App.init);

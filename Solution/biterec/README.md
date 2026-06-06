@@ -23,7 +23,10 @@ pip install -r requirements.txt
 
 # 3. (optional) rebuild the dataset from a raw Open Food Facts CSV
 #    A pre-built data/products.json is already included, so you can skip this.
-python build_data.py
+#    You can point it at ANY Open Food Facts CSV and cap how many products are
+#    kept (for performance) — see "Working with a different / larger dataset".
+python build_data.py                          # bundled CSV, default cap (10,000)
+# python build_data.py /path/to/your.csv 5000 # your CSV, keep 5,000 products
 
 # 4. run the app
 python app.py
@@ -162,13 +165,39 @@ recent-search history · help tooltips · SHAP "why this grade" waterfall **with
   empty);
 * de-duplicates by name + brand.
 
-To use the full dump, download it from Open Food Facts and pass the path as an argument:
+### 1. Use your own dataset (any Open Food Facts CSV)
+
+You are not limited to the bundled file — point `build_data.py` at **any** Open Food Facts CSV
+export (for example the full ~12 GB dump downloaded from Open Food Facts) by passing its path:
 
 ```bash
-python build_data.py path/to/your_openfoodfacts_export.csv
+python build_data.py /path/to/your_openfoodfacts_export.csv
 ```
 
-With no argument it defaults to the bundled `data/openfoodfacts_short_30MB.csv`.
+With no path given it falls back to the bundled `data/openfoodfacts_short_30MB.csv`. The script only
+reads the columns it needs, so larger or differently-shaped exports still work. After it finishes,
+just run `python app.py` as usual — the app always reads the freshly-built `data/products.json`.
+
+### 2. Limit how many products are processed (performance tuning)
+
+The full export contains **hundreds of thousands of products**, and the app trains its ML models
+and builds the SHAP explainers **at start-up** — so an uncapped catalogue can make the app take a
+very long time to launch. To keep start-up fast, `build_data.py` caps how many products are kept:
+
+* **Edit the cap in code:** change the **`MAX_PRODUCTS`** constant near the top of `build_data.py`
+  (default **`10000`**). Set it to `None` for no cap.
+* **Or set it on the command line** as the second argument (overrides the constant):
+
+```bash
+python build_data.py /path/to/your_export.csv 20000   # keep 20,000 products
+python build_data.py /path/to/your_export.csv 5000    # keep 5,000 (faster, lighter machines)
+```
+
+Pick the number to suit your machine: lower it (e.g. 3,000–5,000) on a laptop for a snappy start;
+raise it on a stronger machine for more variety. The selection prefers products that have a photo
+and is reproducible (fixed random seed). Thanks to this cap — plus the fact that the global SHAP
+importance and cross-validated accuracy are computed on bounded samples — **start-up time stays in
+the tens of seconds regardless of how big the source CSV is**, instead of growing with the dataset.
 
 ---
 

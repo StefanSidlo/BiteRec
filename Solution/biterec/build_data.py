@@ -44,6 +44,15 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_CSV = os.path.join(HERE, "data", "openfoodfacts_short_30MB.csv")
 OUT_JSON = os.path.join(HERE, "data", "products.json")
 
+# -------------------------------------------------------------------------
+# PERFORMANCE CAP -- the most important knob for big dumps.
+# The full Open Food Facts export yields hundreds of thousands of products,
+# which makes the app slow to start (the ML model + SHAP are trained at boot).
+# Keep this to a few thousand for a fast, snappy demo. Set to None for no cap.
+# You can also override it on the command line:  python build_data.py big.csv 20000
+# -------------------------------------------------------------------------
+MAX_PRODUCTS = 10000
+
 # Columns we read from the (potentially enormous) CSV. Reading a subset keeps
 # memory usage low even on the full Open Food Facts dump.
 USECOLS = [
@@ -297,6 +306,25 @@ def main():
         seen.add(key)
         deduped.append(p)
     products = deduped
+
+    # --- Cap the number of products for a fast startup --------------------
+    max_products = MAX_PRODUCTS
+    if len(sys.argv) > 2:
+        try:
+            max_products = int(sys.argv[2])
+        except ValueError:
+            pass
+    if max_products and len(products) > max_products:
+        import random
+        rng = random.Random(42)  # reproducible selection
+        # Prefer products that have a photo (nicer demo), then fill the rest.
+        with_img = [p for p in products if p["image"]]
+        without = [p for p in products if not p["image"]]
+        rng.shuffle(with_img)
+        rng.shuffle(without)
+        products = (with_img + without)[:max_products]
+        print(f"  capped to {max_products:,} products "
+              f"(change MAX_PRODUCTS in build_data.py, or pass a number as the 2nd arg)")
 
     print(f"  final clean products: {len(products):,}")
     with_img = sum(1 for p in products if p["image"])

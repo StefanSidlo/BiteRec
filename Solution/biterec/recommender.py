@@ -108,10 +108,11 @@ class Recommender:
                 self.explainer = shap.TreeExplainer(self.model)
                 self._shap_base = float(np.array(self.explainer.expected_value)
                                         @ self._class_health)
-                # Global SHAP importance: mean |SHAP| per feature across the
-                # catalog, summed over classes (matches the notebook's
-                # summary_plot(plot_type="bar")).
-                sv = np.array(self.explainer.shap_values(self.X))   # (n, feat, cls)
+                # Global SHAP importance: mean |SHAP| per feature. Computed on a
+                # bounded random sample so startup stays fast even on large
+                # datasets (the estimate is stable well below 1,000 rows).
+                Xs = self._sample_rows(self.X, 600)
+                sv = np.array(self.explainer.shap_values(Xs))       # (n, feat, cls)
                 mean_abs = np.abs(sv).sum(axis=2).mean(axis=0)       # (feat,)
                 self.shap_importance = {ML_FEATURES[i]: float(mean_abs[i])
                                         for i in range(len(ML_FEATURES))}
@@ -121,15 +122,30 @@ class Recommender:
         # feature importances, normalised
         imp = self.model.feature_importances_
         self.feature_importance = {ML_FEATURES[i]: float(imp[i]) for i in range(len(ML_FEATURES))}
-        # 5-fold cross-validated accuracy -- an honest estimate of how well
-        # the model generalises, surfaced on the insights dashboard.
+        # 5-fold cross-validated accuracy -- an honest estimate of generalisation.
+        # On large datasets we cross-validate a capped sample to keep boot fast.
         try:
+            Xc, yc = self._sample_xy(self.X, self.y, 4000)
             cv = cross_val_score(
-                RandomForestClassifier(n_estimators=120, random_state=42),
-                self.X, self.y, cv=5)
+                RandomForestClassifier(n_estimators=100, random_state=42),
+                Xc, yc, cv=5)
             self.train_accuracy = float(cv.mean())
         except Exception:
             self.train_accuracy = float((self.model.predict(self.X) == self.y).mean())
+
+    @staticmethod
+    def _sample_rows(X, n):
+        if len(X) <= n:
+            return X
+        idx = np.random.RandomState(0).choice(len(X), n, replace=False)
+        return X[idx]
+
+    @staticmethod
+    def _sample_xy(X, y, n):
+        if len(X) <= n:
+            return X, y
+        idx = np.random.RandomState(0).choice(len(X), n, replace=False)
+        return X[idx], y[idx]
 
     def _expected_health(self, feature_vector):
         """Continuous health score 0-100 from the model's class probabilities."""
@@ -500,9 +516,10 @@ class Recommender:
                 self._eco_shap_base = float(np.array(self.eco_explainer.expected_value)
                                             @ self._eco_class_score)
             try:
+                Xe_c, ye_c = self._sample_xy(Xe, ye, 4000)
                 self.eco_accuracy = round(float(
                     cross_val_score(RandomForestClassifier(n_estimators=80, random_state=1),
-                                    Xe, ye, cv=5).mean()) * 100, 1)
+                                    Xe_c, ye_c, cv=5).mean()) * 100, 1)
             except Exception:
                 self.eco_accuracy = None
         except Exception:
@@ -617,7 +634,9 @@ class Recommender:
         }
 
     def _explain(self, alt, base, kind):
-        """Plain-language, max two sentences (FR-06)."""
+        """Plain-language reasons this product beats the searched one.
+        Two sentences: the first lists the concrete improvements, the second
+        states both grades (FR-06)."""
         em_a, em_b = alt["eco_metrics"], base["eco_metrics"]
         na, nb = alt["nutrients"], base["nutrients"]
         bits = []
@@ -629,19 +648,34 @@ class Recommender:
             if em_b["water_l"] > 0:
                 wp = round((em_b["water_l"] - em_a["water_l"]) / em_b["water_l"] * 100)
                 if wp > 0:
-                    bits.append(f"{wp}% less estimated water")
+                    bits.append(f"about {wp}% less estimated water")
+            if alt.get("organic") and not base.get("organic"):
+                bits.append("certified organic")
+            if (alt.get("additives_n") is not None and base.get("additives_n") is not None
+                    and base["additives_n"] - alt["additives_n"] >= 1):
+                bits.append(f"{base['additives_n'] - alt['additives_n']} fewer additives")
+            if alt["health_score"] > base["health_score"] + 3:
+                bits.append("and healthier too")
             lead = "A greener pick"
         elif kind == "Better for You":
             if nb["sugars"] - na["sugars"] > 1:
                 bits.append(f"{round(nb['sugars'] - na['sugars'], 1)} g less sugar")
             if na["proteins"] - nb["proteins"] > 0.5:
                 bits.append(f"{round(na['proteins'] - nb['proteins'], 1)} g more protein")
+            if nb["saturated_fat"] - na["saturated_fat"] > 0.5:
+                bits.append(f"{round(nb['saturated_fat'] - na['saturated_fat'], 1)} g less saturated fat")
             if nb["salt"] - na["salt"] > 0.1:
                 bits.append(f"{round(nb['salt'] - na['salt'], 2)} g less salt")
+            if nb["energy_kcal"] - na["energy_kcal"] > 20:
+                bits.append(f"{round(nb['energy_kcal'] - na['energy_kcal'])} kcal less energy")
+            if na["fiber"] - nb["fiber"] > 0.5:
+                bits.append(f"{round(na['fiber'] - nb['fiber'], 1)} g more fibre")
+            if alt["eco_score"] > base["eco_score"] + 3:
+                bits.append("and greener too")
             lead = "A healthier pick"
         else:
             lead = "Better on both health and environment"
-        gains = ", ".join(bits[:2]) if bits else "a better overall balance"
+        gains = ", ".join(bits[:4]) if bits else "a better overall balance"
         s1 = f"{lead}: {gains}."
         s2 = (f"Nutri-Score {alt['nutriscore'].upper()} and Eco-Score "
               f"{alt['ecoscore'].upper()} (yours: {base['nutriscore'].upper()}/"
